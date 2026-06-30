@@ -1,20 +1,101 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import TruckForm from './components/TruckForm'
+import StickyHeader from './components/StickyHeader'
+import WeighingTable from './components/WeighingTable'
+import useStore from './useStore'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { 
+    truckData, 
+    rows, 
+    location,
+    setTruckData, 
+    updateRows, 
+    loadData, 
+    resetData,
+    saveLocation,
+    isLoading 
+  } = useStore()
+
+  // Load data saat aplikasi pertama kali dibuka
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  // Auto-save ke Supabase setiap ada perubahan
+  useEffect(() => {
+    if (truckData && rows.length > 0) {
+      const timeoutId = setTimeout(() => {
+        updateRows(rows)
+      }, 2000) // Save setiap 2 detik setelah perubahan
+      return () => clearTimeout(timeoutId)
+    }
+  }, [rows])
+
+  // Ambil GPS saat masuk halaman timbangan
+  useEffect(() => {
+    if (truckData && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          saveLocation(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+          console.error("Gagal ambil GPS:", error);
+        }
+      );
+    }
+  }, [truckData])
+
+  const handleTruckSave = async (data) => {
+    await setTruckData(data)
+  }
+
+  // Hitung Statistik Realtime
+  const totalKarung = rows.length;
+  const grandTotal = rows.reduce((sum, row) => {
+    const rowSum = row.values.reduce((rSum, val) => rSum + (parseFloat(val) || 0), 0);
+    return sum + rowSum;
+  }, 0);
+  const rata2 = totalKarung > 0 ? grandTotal / totalKarung : 0;
+
+  if (!truckData) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          </div>
+        ) : (
+          <TruckForm onSave={handleTruckSave} />
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow-lg text-center">
-        <h1 className="text-2xl font-bold mb-4">Aplikasi Timbangan</h1>
-        <p className="text-gray-600 mb-4">Coming soon...</p>
-        <button 
-          onClick={() => setCount(count + 1)}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
-          Count: {count}
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <StickyHeader 
+        rata2={rata2} 
+        totalKarung={totalKarung} 
+        grandTotal={grandTotal}
+        targetTotal={5000}
+        location={location}
+      />
+      <WeighingTable 
+        truckData={truckData} 
+        rows={rows} 
+        setRows={updateRows}
+        onReset={resetData}
+      />
+      
+      {isLoading && (
+        <div className="fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
+          💾 Menyimpan...
+        </div>
+      )}
     </div>
   )
 }
