@@ -7,10 +7,12 @@ export default function ExportButtons({ truckData, rows }) {
 
   const exportExcel = () => {
     const totalKarung = rows.length;
-    const grandTotal = rows.reduce((sum, row) => sum + row.berat, 0);
+    const grandTotal = rows.reduce((sum, row) => {
+      const rowSum = row.values.reduce((rSum, val) => rSum + (parseFloat(val) || 0), 0);
+      return sum + rowSum;
+    }, 0);
     const rata2 = totalKarung > 0 ? grandTotal / totalKarung : 0;
 
-    // Header info
     const headerData = [
       { 'Field': 'No Plat', 'Value': truckData.noPlat },
       { 'Field': 'Nama Sopir', 'Value': truckData.namaSopir },
@@ -24,11 +26,14 @@ export default function ExportButtons({ truckData, rows }) {
       { 'Field': '', 'Value': '' },
     ];
 
-    // Data karung
-    const sackData = rows.map((row, index) => ({
-      'No': index + 1,
-      'Berat (kg)': row.berat
-    }));
+    const sackData = rows.map((row, index) => {
+      const rowData = { 'No Karung': index + 1 };
+      row.values.forEach((val, i) => {
+        rowData[`Titik ${i + 1}`] = val || 0;
+      });
+      rowData['Subtotal'] = row.values.reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+      return rowData;
+    });
 
     const allData = [...headerData, ...sackData];
     const ws = XLSX.utils.json_to_sheet(allData);

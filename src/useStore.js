@@ -6,7 +6,7 @@ const useStore = create((set, get) => ({
   truckId: null,
   weighingId: null,
   location: null,
-  rows: [], // Setiap row = 1 karung, 1 angka
+  rows: [{ id: 1, values: Array(10).fill('') }],
   isLoading: false,
   error: null,
 
@@ -32,7 +32,7 @@ const useStore = create((set, get) => ({
           truck_id: truck.id,
           tanggal: now.toISOString().split('T')[0],
           jam: now.toTimeString().split(' ')[0],
-          target_grand_total: 5000,
+          target_grand_total: 10000,
           status: 'draft'
         }])
         .select()
@@ -44,7 +44,7 @@ const useStore = create((set, get) => ({
         truckData: data, 
         truckId: truck.id,
         weighingId: weighing.id,
-        rows: [], // Reset rows
+        rows: [{ id: 1, values: Array(10).fill('') }],
         isLoading: false 
       });
       
@@ -52,7 +52,7 @@ const useStore = create((set, get) => ({
         truckData: data, 
         truckId: truck.id,
         weighingId: weighing.id,
-        rows: []
+        rows: [{ id: 1, values: Array(10).fill('') }]
       }));
     } catch (error) {
       console.error('Error saving truck:', error);
@@ -60,90 +60,135 @@ const useStore = create((set, get) => ({
     }
   },
 
-  addSack: async (berat) => {
-    const { weighingId, rows } = get();
-    if (!weighingId) return;
+  updateCell: async (rowId, colIndex, value) => {
+    const { rows, weighingId } = get();
+    
+    const newRows = rows.map(row => {
+      if (row.id === rowId) {
+        const newValues = [...row.values];
+        newValues[colIndex] = value === '' ? '' : parseFloat(value) || 0;
+        return { ...row, values: newValues };
+      }
+      return row;
+    });
 
-    const newRow = {
-      id: rows.length + 1,
-      berat: parseFloat(berat) || 0
-    };
-
-    const newRows = [...rows, newRow];
     set({ rows: newRows, isLoading: true });
 
-    try {
-      await supabase.from('sacks').delete().eq('weighing_id', weighingId);
+    if (weighingId) {
+      try {
+        await supabase.from('sacks').delete().eq('weighing_id', weighingId);
 
-      const sacksData = newRows.map((row, index) => ({
-        weighing_id: weighingId,
-        nomor_karung: index + 1,
-        col_1: row.berat,
-        col_2: 0,
-        col_3: 0,
-        col_4: 0,
-        col_5: 0,
-        col_6: 0,
-        col_7: 0,
-        col_8: 0,
-        col_9: 0,
-        col_10: 0,
-      }));
+        const sacksData = newRows.map((row, index) => ({
+          weighing_id: weighingId,
+          nomor_karung: index + 1,
+          col_1: parseFloat(row.values[0]) || 0,
+          col_2: parseFloat(row.values[1]) || 0,
+          col_3: parseFloat(row.values[2]) || 0,
+          col_4: parseFloat(row.values[3]) || 0,
+          col_5: parseFloat(row.values[4]) || 0,
+          col_6: parseFloat(row.values[5]) || 0,
+          col_7: parseFloat(row.values[6]) || 0,
+          col_8: parseFloat(row.values[7]) || 0,
+          col_9: parseFloat(row.values[8]) || 0,
+          col_10: parseFloat(row.values[9]) || 0,
+        }));
 
-      const { error } = await supabase.from('sacks').insert(sacksData);
-      if (error) throw error;
+        const { error } = await supabase.from('sacks').insert(sacksData);
+        if (error) throw error;
 
-      localStorage.setItem('timbangan_data', JSON.stringify({ 
-        ...get(),
-        rows: newRows
-      }));
+        localStorage.setItem('timbangan_data', JSON.stringify({ 
+          ...get(),
+          rows: newRows
+        }));
 
-      set({ isLoading: false });
-    } catch (error) {
-      console.error('Error saving sack:', error);
-      set({ error: error.message, isLoading: false });
+        set({ isLoading: false });
+      } catch (error) {
+        console.error('Error saving:', error);
+        set({ error: error.message, isLoading: false });
+      }
     }
   },
 
-  deleteSack: async (id) => {
-    const { weighingId, rows } = get();
-    if (!weighingId) return;
-
-    const newRows = rows.filter(row => row.id !== id)
-      .map((row, index) => ({ ...row, nomor_karung: index + 1 }));
-
+  addRow: async () => {
+    const { rows, weighingId } = get();
+    const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
+    const newRows = [...rows, { id: newId, values: Array(10).fill('') }];
+    
     set({ rows: newRows, isLoading: true });
 
-    try {
-      await supabase.from('sacks').delete().eq('weighing_id', weighingId);
+    if (weighingId) {
+      try {
+        await supabase.from('sacks').delete().eq('weighing_id', weighingId);
 
-      const sacksData = newRows.map((row, index) => ({
-        weighing_id: weighingId,
-        nomor_karung: index + 1,
-        col_1: row.berat,
-        col_2: 0,
-        col_3: 0,
-        col_4: 0,
-        col_5: 0,
-        col_6: 0,
-        col_7: 0,
-        col_8: 0,
-        col_9: 0,
-        col_10: 0,
-      }));
+        const sacksData = newRows.map((row, index) => ({
+          weighing_id: weighingId,
+          nomor_karung: index + 1,
+          col_1: parseFloat(row.values[0]) || 0,
+          col_2: parseFloat(row.values[1]) || 0,
+          col_3: parseFloat(row.values[2]) || 0,
+          col_4: parseFloat(row.values[3]) || 0,
+          col_5: parseFloat(row.values[4]) || 0,
+          col_6: parseFloat(row.values[5]) || 0,
+          col_7: parseFloat(row.values[6]) || 0,
+          col_8: parseFloat(row.values[7]) || 0,
+          col_9: parseFloat(row.values[8]) || 0,
+          col_10: parseFloat(row.values[9]) || 0,
+        }));
 
-      const { error } = await supabase.from('sacks').insert(sacksData);
-      if (error) throw error;
+        const { error } = await supabase.from('sacks').insert(sacksData);
+        if (error) throw error;
 
-      localStorage.setItem('timbangan_data', JSON.stringify({ 
-        ...get(),
-        rows: newRows
-      }));
+        localStorage.setItem('timbangan_data', JSON.stringify({ 
+          ...get(),
+          rows: newRows
+        }));
 
-      set({ isLoading: false });
-    } catch (error) {
-      console.error('Error deleting sack:', error);
-      set({ error: error.message, isLoading: false });
+        set({ isLoading: false });
+      } catch (error) {
+        console.error('Error adding row:', error);
+        set({ error: error.message, isLoading: false });
+      }
+    }
+  },
+
+  deleteRow: async (rowId) => {
+    const { rows, weighingId } = get();
+    const newRows = rows.filter(row => row.id !== rowId);
+    
+    set({ rows: newRows, isLoading: true });
+
+    if (weighingId) {
+      try {
+        await supabase.from('sacks').delete().eq('weighing_id', weighingId);
+
+        const sacksData = newRows.map((row, index) => ({
+          weighing_id: weighingId,
+          nomor_karung: index + 1,
+          col_1: parseFloat(row.values[0]) || 0,
+          col_2: parseFloat(row.values[1]) || 0,
+          col_3: parseFloat(row.values[2]) || 0,
+          col_4: parseFloat(row.values[3]) || 0,
+          col_5: parseFloat(row.values[4]) || 0,
+          col_6: parseFloat(row.values[5]) || 0,
+          col_7: parseFloat(row.values[6]) || 0,
+          col_8: parseFloat(row.values[7]) || 0,
+          col_9: parseFloat(row.values[8]) || 0,
+          col_10: parseFloat(row.values[9]) || 0,
+        }));
+
+        const { error } = await supabase.from('sacks').insert(sacksData);
+        if (error) throw error;
+
+        localStorage.setItem('timbangan_data', JSON.stringify({ 
+          ...get(),
+          rows: newRows
+        }));
+
+        set({ isLoading: false });
+      } catch (error) {
+        console.error('Error deleting row:', error);
+        set({ error: error.message, isLoading: false });
+      }
     }
   },
 
@@ -174,7 +219,7 @@ const useStore = create((set, get) => ({
         truckId: parsed.truckId,
         weighingId: parsed.weighingId,
         location: parsed.location || null,
-        rows: parsed.rows || []
+        rows: parsed.rows || [{ id: 1, values: Array(10).fill('') }]
       });
     }
   },
@@ -192,7 +237,7 @@ const useStore = create((set, get) => ({
       truckId: null,
       weighingId: null,
       location: null,
-      rows: []
+      rows: [{ id: 1, values: Array(10).fill('') }]
     });
   },
 

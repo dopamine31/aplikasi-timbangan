@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import TruckForm from './components/TruckForm'
 import StickyHeader from './components/StickyHeader'
 import WeighingTable from './components/WeighingTable'
@@ -10,8 +10,6 @@ function App() {
     rows, 
     location,
     setTruckData, 
-    addSack,
-    deleteSack,
     loadData, 
     resetData,
     saveLocation,
@@ -40,7 +38,10 @@ function App() {
   }
 
   const totalKarung = rows.length;
-  const grandTotal = rows.reduce((sum, row) => sum + row.berat, 0);
+  const grandTotal = rows.reduce((sum, row) => {
+    const rowSum = row.values.reduce((rSum, val) => rSum + (parseFloat(val) || 0), 0);
+    return sum + rowSum;
+  }, 0);
   const rata2 = totalKarung > 0 ? grandTotal / totalKarung : 0;
 
   if (!truckData) {
@@ -66,15 +67,13 @@ function App() {
         rata2={rata2} 
         totalKarung={totalKarung} 
         grandTotal={grandTotal}
-        targetTotal={5000}
+        targetTotal={10000}
         location={location}
         truckData={truckData}
       />
       <WeighingTable 
         truckData={truckData} 
-        rows={rows} 
-        addSack={addSack}
-        deleteSack={deleteSack}
+        rows={rows}
         onReset={resetData}
       />
       

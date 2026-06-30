@@ -1,48 +1,65 @@
 import { useState, useRef, useEffect } from 'react';
 import CustomNumpad from './CustomNumpad';
 import ExportButtons from './ExportButtons';
+import useStore from '../useStore';
 
-export default function WeighingTable({ truckData, rows, addSack, deleteSack, onReset }) {
+export default function WeighingTable({ truckData, rows, onReset }) {
+  const { updateCell, addRow, deleteRow } = useStore();
+  const [activeCell, setActiveCell] = useState(null);
   const [showNumpad, setShowNumpad] = useState(false);
-  const [currentValue, setCurrentValue] = useState('');
-  const inputRef = useRef(null);
+  const tableRef = useRef(null);
 
-  // Auto-focus ke input setelah render
-  useEffect(() => {
-    if (inputRef.current && !showNumpad) {
-      inputRef.current.focus();
-    }
-  }, [rows.length, showNumpad]);
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && currentValue) {
-      e.preventDefault();
-      addSack(currentValue);
-      setCurrentValue('');
-    }
+  const getRowSubtotal = (row) => {
+    return row.values.reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   };
 
-  const openNumpad = () => {
+  const handleCellClick = (rowId, colIndex) => {
+    setActiveCell({ rowId, colIndex });
     setShowNumpad(true);
   };
 
-  const closeNumpad = () => {
+  const handleNumpadClose = (value) => {
+    if (activeCell && value !== null) {
+      updateCell(activeCell.rowId, activeCell.colIndex, value);
+      
+      // Auto-move ke kolom berikutnya
+      const currentRow = rows.find(r => r.id === activeCell.rowId);
+      if (currentRow) {
+        const nextCol = activeCell.colIndex + 1;
+        if (nextCol < 10) {
+          // Masih ada kolom di baris ini
+          setTimeout(() => {
+            setActiveCell({ rowId: activeCell.rowId, colIndex: nextCol });
+            setShowNumpad(true);
+          }, 100);
+        } else {
+          // Sudah kolom terakhir, buat baris baru
+          setTimeout(() => {
+            addRow();
+          }, 100);
+        }
+      }
+    }
     setShowNumpad(false);
-    if (currentValue) {
-      addSack(currentValue);
-      setCurrentValue('');
+  };
+
+  const handleKeyDown = (rowId, colIndex, e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const nextCol = colIndex + 1;
+      if (nextCol < 10) {
+        setActiveCell({ rowId, colIndex: nextCol });
+      } else {
+        addRow();
+      }
     }
   };
 
-  const handleNumpadChange = (value) => {
-    setCurrentValue(value);
-  };
-
   return (
-    <div className="p-3 pb-32">
+    <div className="p-2 pb-32">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-bold text-gray-800">
-          📦 Input Karung
+          📦 Penimbangan
         </h2>
         <button 
           onClick={() => {
@@ -57,72 +74,68 @@ export default function WeighingTable({ truckData, rows, addSack, deleteSack, on
         </button>
       </div>
 
-      {/* Input Area */}
-      <div className="bg-white p-4 rounded-xl shadow-sm mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Berat Karung (kg)
-        </label>
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="number"
-            value={currentValue}
-            onChange={(e) => setCurrentValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="flex-1 p-3 border-2 border-gray-300 rounded-lg text-lg font-bold text-center focus:border-blue-500 focus:outline-none"
-            placeholder="0"
-            autoFocus
-          />
-          <button
-            onClick={openNumpad}
-            className="bg-blue-600 text-white px-4 py-3 rounded-lg font-bold active:bg-blue-700"
-          >
-            
-          </button>
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-           Tekan Enter untuk simpan & lanjut ke karung berikutnya
-        </p>
-      </div>
-
-      {/* Daftar Karung */}
-      <div id="tabel-timbangan" className="bg-white p-4 rounded-xl shadow-sm mb-4">
-        <h3 className="font-bold text-lg mb-3 border-b pb-2">Data Karung</h3>
-        
-        {rows.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">Belum ada data karung</p>
-        ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {rows.map((row, index) => (
-              <div key={row.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
-                    #{index + 1}
-                  </span>
-                  <span className="font-bold text-lg">{row.berat} kg</span>
-                </div>
-                <button
-                  onClick={() => deleteSack(row.id)}
-                  className="text-red-500 p-2 hover:bg-red-50 rounded-full"
-                >
-                  ️
-                </button>
+      <div id="tabel-timbangan" className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {rows.map((row, rowIndex) => (
+          <div key={row.id} className="border-b border-gray-200 last:border-0">
+            <div className="flex items-center">
+              {/* Nomor Karung */}
+              <div className="bg-gray-100 px-3 py-2 font-bold text-sm border-r border-gray-200 min-w-[60px] text-center">
+                #{rowIndex + 1}
               </div>
-            ))}
+              
+              {/* 10 Kolom Input */}
+              <div className="flex-1 overflow-x-auto">
+                <div className="flex min-w-[600px]">
+                  {row.values.map((val, colIndex) => (
+                    <input
+                      key={colIndex}
+                      type="number"
+                      value={val}
+                      onChange={(e) => updateCell(row.id, colIndex, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(row.id, colIndex, e)}
+                      onClick={() => handleCellClick(row.id, colIndex)}
+                      className={`
+                        w-16 p-2 text-center font-bold border-r border-gray-200 last:border-r-0
+                        ${val ? 'bg-blue-50 text-blue-700' : 'bg-white text-gray-400'}
+                        focus:outline-none focus:bg-yellow-50
+                      `}
+                      placeholder="0"
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {/* Subtotal */}
+              <div className="bg-green-100 px-3 py-2 font-bold text-sm border-l border-gray-200 min-w-[80px] text-center text-green-700">
+                {getRowSubtotal(row)}
+              </div>
+              
+              {/* Delete Button */}
+              <button
+                onClick={() => deleteRow(row.id)}
+                className="px-3 py-2 text-red-500 hover:bg-red-50"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
-        )}
+        ))}
       </div>
 
-      {/* Numpad Modal */}
-      {showNumpad && (
+      <button
+        onClick={addRow}
+        className="w-full mt-4 bg-green-600 text-white p-3 rounded-lg font-bold active:bg-green-700"
+      >
+        + Tambah Baris
+      </button>
+
+      {showNumpad && activeCell && (
         <CustomNumpad 
-          value={currentValue}
-          onChange={handleNumpadChange}
-          onClose={closeNumpad}
+          value={rows.find(r => r.id === activeCell.rowId)?.values[activeCell.colIndex] || ''}
+          onClose={handleNumpadClose}
         />
       )}
 
-      {/* Export Buttons */}
       <ExportButtons truckData={truckData} rows={rows} />
     </div>
   );
