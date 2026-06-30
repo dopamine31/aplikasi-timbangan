@@ -10,29 +10,18 @@ function App() {
     rows, 
     location,
     setTruckData, 
-    updateRows, 
+    addSack,
+    deleteSack,
     loadData, 
     resetData,
     saveLocation,
     isLoading 
   } = useStore()
 
-  // Load data saat aplikasi pertama kali dibuka
   useEffect(() => {
     loadData()
   }, [])
 
-  // Auto-save ke Supabase setiap ada perubahan
-  useEffect(() => {
-    if (truckData && rows.length > 0) {
-      const timeoutId = setTimeout(() => {
-        updateRows(rows)
-      }, 2000) // Save setiap 2 detik setelah perubahan
-      return () => clearTimeout(timeoutId)
-    }
-  }, [rows])
-
-  // Ambil GPS saat masuk halaman timbangan
   useEffect(() => {
     if (truckData && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -50,12 +39,8 @@ function App() {
     await setTruckData(data)
   }
 
-  // Hitung Statistik Realtime
   const totalKarung = rows.length;
-  const grandTotal = rows.reduce((sum, row) => {
-    const rowSum = row.values.reduce((rSum, val) => rSum + (parseFloat(val) || 0), 0);
-    return sum + rowSum;
-  }, 0);
+  const grandTotal = rows.reduce((sum, row) => sum + row.berat, 0);
   const rata2 = totalKarung > 0 ? grandTotal / totalKarung : 0;
 
   if (!truckData) {
@@ -83,11 +68,13 @@ function App() {
         grandTotal={grandTotal}
         targetTotal={5000}
         location={location}
+        truckData={truckData}
       />
       <WeighingTable 
         truckData={truckData} 
         rows={rows} 
-        setRows={updateRows}
+        addSack={addSack}
+        deleteSack={deleteSack}
         onReset={resetData}
       />
       

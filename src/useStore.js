@@ -6,14 +6,13 @@ const useStore = create((set, get) => ({
   truckId: null,
   weighingId: null,
   location: null,
-  rows: [{ id: 1, values: Array(10).fill('') }],
+  rows: [], // Setiap row = 1 karung, 1 angka
   isLoading: false,
   error: null,
 
   setTruckData: async (data) => {
     set({ isLoading: true });
     try {
-      // 1. Insert ke tabel trucks
       const { data: truck, error: truckError } = await supabase
         .from('trucks')
         .insert([{
@@ -26,7 +25,6 @@ const useStore = create((set, get) => ({
 
       if (truckError) throw truckError;
 
-      // 2. Insert ke tabel weighings
       const now = new Date();
       const { data: weighing, error: weighingError } = await supabase
         .from('weighings')
@@ -46,13 +44,15 @@ const useStore = create((set, get) => ({
         truckData: data, 
         truckId: truck.id,
         weighingId: weighing.id,
+        rows: [], // Reset rows
         isLoading: false 
       });
       
       localStorage.setItem('timbangan_data', JSON.stringify({ 
         truckData: data, 
         truckId: truck.id,
-        weighingId: weighing.id
+        weighingId: weighing.id,
+        rows: []
       }));
     } catch (error) {
       console.error('Error saving truck:', error);
@@ -60,48 +60,89 @@ const useStore = create((set, get) => ({
     }
   },
 
-  updateRows: async (rows) => {
-    const { weighingId } = get();
-    if (!weighingId) {
-      console.log('No weighingId, skipping save');
-      return;
-    }
+  addSack: async (berat) => {
+    const { weighingId, rows } = get();
+    if (!weighingId) return;
 
-    set({ rows, isLoading: true });
+    const newRow = {
+      id: rows.length + 1,
+      berat: parseFloat(berat) || 0
+    };
+
+    const newRows = [...rows, newRow];
+    set({ rows: newRows, isLoading: true });
 
     try {
-      // Hapus data sacks lama untuk weighing ini
       await supabase.from('sacks').delete().eq('weighing_id', weighingId);
 
-      // Siapkan data baru
-      const sacksData = rows.map((row, index) => ({
+      const sacksData = newRows.map((row, index) => ({
         weighing_id: weighingId,
         nomor_karung: index + 1,
-        col_1: parseFloat(row.values[0]) || 0,
-        col_2: parseFloat(row.values[1]) || 0,
-        col_3: parseFloat(row.values[2]) || 0,
-        col_4: parseFloat(row.values[3]) || 0,
-        col_5: parseFloat(row.values[4]) || 0,
-        col_6: parseFloat(row.values[5]) || 0,
-        col_7: parseFloat(row.values[6]) || 0,
-        col_8: parseFloat(row.values[7]) || 0,
-        col_9: parseFloat(row.values[8]) || 0,
-        col_10: parseFloat(row.values[9]) || 0,
+        col_1: row.berat,
+        col_2: 0,
+        col_3: 0,
+        col_4: 0,
+        col_5: 0,
+        col_6: 0,
+        col_7: 0,
+        col_8: 0,
+        col_9: 0,
+        col_10: 0,
       }));
 
-      // Insert data baru
       const { error } = await supabase.from('sacks').insert(sacksData);
       if (error) throw error;
 
       localStorage.setItem('timbangan_data', JSON.stringify({ 
         ...get(),
-        rows 
+        rows: newRows
       }));
 
       set({ isLoading: false });
-      console.log('✓ Data saved to Supabase');
     } catch (error) {
-      console.error('Error saving sacks:', error);
+      console.error('Error saving sack:', error);
+      set({ error: error.message, isLoading: false });
+    }
+  },
+
+  deleteSack: async (id) => {
+    const { weighingId, rows } = get();
+    if (!weighingId) return;
+
+    const newRows = rows.filter(row => row.id !== id)
+      .map((row, index) => ({ ...row, nomor_karung: index + 1 }));
+
+    set({ rows: newRows, isLoading: true });
+
+    try {
+      await supabase.from('sacks').delete().eq('weighing_id', weighingId);
+
+      const sacksData = newRows.map((row, index) => ({
+        weighing_id: weighingId,
+        nomor_karung: index + 1,
+        col_1: row.berat,
+        col_2: 0,
+        col_3: 0,
+        col_4: 0,
+        col_5: 0,
+        col_6: 0,
+        col_7: 0,
+        col_8: 0,
+        col_9: 0,
+        col_10: 0,
+      }));
+
+      const { error } = await supabase.from('sacks').insert(sacksData);
+      if (error) throw error;
+
+      localStorage.setItem('timbangan_data', JSON.stringify({ 
+        ...get(),
+        rows: newRows
+      }));
+
+      set({ isLoading: false });
+    } catch (error) {
+      console.error('Error deleting sack:', error);
       set({ error: error.message, isLoading: false });
     }
   },
@@ -111,7 +152,6 @@ const useStore = create((set, get) => ({
     if (!truckId) return;
     
     set({ location: { lat, lng } });
-    console.log('Menyimpan lokasi ke Supabase...', lat, lng);
 
     try {
       const { error } = await supabase
@@ -134,7 +174,7 @@ const useStore = create((set, get) => ({
         truckId: parsed.truckId,
         weighingId: parsed.weighingId,
         location: parsed.location || null,
-        rows: parsed.rows || [{ id: 1, values: Array(10).fill('') }]
+        rows: parsed.rows || []
       });
     }
   },
@@ -152,7 +192,7 @@ const useStore = create((set, get) => ({
       truckId: null,
       weighingId: null,
       location: null,
-      rows: [{ id: 1, values: Array(10).fill('') }] 
+      rows: []
     });
   },
 

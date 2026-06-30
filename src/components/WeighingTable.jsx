@@ -1,51 +1,48 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import CustomNumpad from './CustomNumpad';
 import ExportButtons from './ExportButtons';
 
-export default function WeighingTable({ truckData, rows, setRows, onReset }) {
-  const [activeCell, setActiveCell] = useState(null);
+export default function WeighingTable({ truckData, rows, addSack, deleteSack, onReset }) {
+  const [showNumpad, setShowNumpad] = useState(false);
+  const [currentValue, setCurrentValue] = useState('');
+  const inputRef = useRef(null);
 
-  const addRow = () => {
-    const newId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
-    setRows([...rows, { id: newId, values: Array(10).fill('') }]);
-  };
+  // Auto-focus ke input setelah render
+  useEffect(() => {
+    if (inputRef.current && !showNumpad) {
+      inputRef.current.focus();
+    }
+  }, [rows.length, showNumpad]);
 
-  const deleteRow = (id) => {
-    if (window.confirm('Yakin hapus baris ini?')) {
-      setRows(rows.filter(row => row.id !== id));
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && currentValue) {
+      e.preventDefault();
+      addSack(currentValue);
+      setCurrentValue('');
     }
   };
 
-  const openNumpad = (rowId, colIndex) => {
-    setActiveCell({ rowId, colIndex });
+  const openNumpad = () => {
+    setShowNumpad(true);
   };
 
   const closeNumpad = () => {
-    setActiveCell(null);
+    setShowNumpad(false);
+    if (currentValue) {
+      addSack(currentValue);
+      setCurrentValue('');
+    }
   };
 
-  const handleNumpadChange = (newValue) => {
-    if (!activeCell) return;
-    
-    setRows(rows.map(row => {
-      if (row.id === activeCell.rowId) {
-        const newValues = [...row.values];
-        newValues[activeCell.colIndex] = newValue;
-        return { ...row, values: newValues };
-      }
-      return row;
-    }));
-  };
-
-  const getRowSubtotal = (row) => {
-    return row.values.reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+  const handleNumpadChange = (value) => {
+    setCurrentValue(value);
   };
 
   return (
-    <div className="p-4 pb-32">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-800 truncate">
-           {truckData.noPlat}
+    <div className="p-3 pb-32">
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-lg font-bold text-gray-800">
+          📦 Input Karung
         </h2>
         <button 
           onClick={() => {
@@ -60,63 +57,72 @@ export default function WeighingTable({ truckData, rows, setRows, onReset }) {
         </button>
       </div>
 
-      <div id="tabel-timbangan" className="bg-white p-4 rounded-xl shadow-sm">
-        <div className="text-center mb-4 border-b pb-2">
-          <h3 className="font-bold text-lg">Data Timbangan</h3>
-          <p className="text-sm text-gray-500">Sopir: {truckData.namaSopir}</p>
+      {/* Input Area */}
+      <div className="bg-white p-4 rounded-xl shadow-sm mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Berat Karung (kg)
+        </label>
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            type="number"
+            value={currentValue}
+            onChange={(e) => setCurrentValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="flex-1 p-3 border-2 border-gray-300 rounded-lg text-lg font-bold text-center focus:border-blue-500 focus:outline-none"
+            placeholder="0"
+            autoFocus
+          />
+          <button
+            onClick={openNumpad}
+            className="bg-blue-600 text-white px-4 py-3 rounded-lg font-bold active:bg-blue-700"
+          >
+            
+          </button>
         </div>
-
-        {rows.map((row, rowIndex) => (
-          <div key={row.id} className="mb-4 border-b border-gray-100 pb-4 last:border-0">
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full text-sm">
-                Karung #{rowIndex + 1}
-              </span>
-              <button
-                onClick={() => deleteRow(row.id)}
-                className="text-red-500 text-sm font-medium px-3 py-1 bg-red-50 rounded-full"
-              >
-                🗑️
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-5 gap-2">
-              {row.values.map((val, colIndex) => (
-                <button
-                  key={colIndex}
-                  onClick={() => openNumpad(row.id, colIndex)}
-                  className={`
-                    w-full p-3 rounded-lg text-center text-lg font-bold border-2 transition-all
-                    ${val !== '' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-gray-50 text-gray-400'}
-                  `}
-                >
-                  {val || '-'}
-                </button>
-              ))}
-            </div>
-            
-            <div className="mt-2 text-right font-bold text-gray-600 text-sm">
-              Subtotal: <span className="text-blue-600 text-base">{getRowSubtotal(row)}</span> kg
-            </div>
-          </div>
-        ))}
-
-        <button
-          onClick={addRow}
-          className="w-full bg-green-600 text-white p-3 rounded-xl text-base font-bold hover:bg-green-700 active:bg-green-800 shadow-md"
-        >
-          + Tambah Baris Karung
-        </button>
+        <p className="text-xs text-gray-500 mt-2">
+           Tekan Enter untuk simpan & lanjut ke karung berikutnya
+        </p>
       </div>
 
-      {activeCell && (
+      {/* Daftar Karung */}
+      <div id="tabel-timbangan" className="bg-white p-4 rounded-xl shadow-sm mb-4">
+        <h3 className="font-bold text-lg mb-3 border-b pb-2">Data Karung</h3>
+        
+        {rows.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">Belum ada data karung</p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {rows.map((row, index) => (
+              <div key={row.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                    #{index + 1}
+                  </span>
+                  <span className="font-bold text-lg">{row.berat} kg</span>
+                </div>
+                <button
+                  onClick={() => deleteSack(row.id)}
+                  className="text-red-500 p-2 hover:bg-red-50 rounded-full"
+                >
+                  ️
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Numpad Modal */}
+      {showNumpad && (
         <CustomNumpad 
-          value={rows.find(r => r.id === activeCell.rowId).values[activeCell.colIndex]}
+          value={currentValue}
           onChange={handleNumpadChange}
           onClose={closeNumpad}
         />
       )}
 
+      {/* Export Buttons */}
       <ExportButtons truckData={truckData} rows={rows} />
     </div>
   );
