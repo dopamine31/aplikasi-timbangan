@@ -13,8 +13,3 @@ Aplikasi penimbangan berbasis web dengan Supabase.
 - React.js + Vite
 - Supabase
 - Tailwind CSS
-
-## Instalasi
-```bash
-npm install
-npm run dev
